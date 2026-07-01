@@ -1,0 +1,19 @@
+@startuml
+title Error Handling Sequence
+
+participant Application
+participant ExternalAPI
+participant LogManager
+
+Application -> ExternalAPI: request
+ExternalAPI --> Application: error
+Application -> Application: retry up to 3 times
+
+alt retry success
+  ExternalAPI --> Application: success
+else retry failed
+  Application -> LogManager: write ERROR
+  Application -> Application: stop
+end
+
+@enduml

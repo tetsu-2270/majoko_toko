@@ -1,0 +1,26 @@
+@startuml
+title Package Diagram
+
+package "src" {
+  class Application
+  class ConfigManager
+  class GmailClient
+  class WordPressClient
+  class HtmlGenerator
+  class ImageSorter
+}
+
+package "config" {
+  file "config.yaml"
+  file "template.html"
+}
+
+package "history" {
+  file "post_history.json"
+}
+
+package "logs" {
+  file "application.log"
+}
+
+@enduml

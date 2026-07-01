@@ -1,0 +1,17 @@
+@startuml
+title Image Processing Activity
+
+start
+:Receive attachments;
+:Save images;
+:Extract file names;
+:Sort by image number;
+if (IMG9999 -> IMG0001 boundary?) then (yes)
+  :Adjust order;
+else (no)
+  :Use normal order;
+endif
+:Return sorted images;
+stop
+
+@enduml

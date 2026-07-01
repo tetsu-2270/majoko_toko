@@ -1,0 +1,19 @@
+@startuml
+title Component Diagram
+
+component "Application" as App
+component "Gmail IMAP" as Gmail
+component "WordPress REST API" as WP
+database "History JSON" as History
+file "template.html" as Template
+file "config.yaml" as Config
+file "application.log" as Log
+
+App --> Gmail
+App --> WP
+App --> History
+App --> Template
+App --> Config
+App --> Log
+
+@enduml

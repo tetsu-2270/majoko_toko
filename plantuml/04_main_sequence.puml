@@ -1,0 +1,28 @@
+@startuml
+title Main Sequence
+
+actor User
+participant Application
+participant GmailClient
+participant AttachmentManager
+participant ImageSorter
+participant HtmlGenerator
+participant WordPressClient
+participant HistoryManager
+
+User -> Application: execute
+Application -> GmailClient: fetch unread mails
+GmailClient --> Application: mails
+Application -> AttachmentManager: save attachments
+AttachmentManager --> Application: image paths
+Application -> ImageSorter: sort images
+ImageSorter --> Application: sorted images
+Application -> HtmlGenerator: generate HTML
+HtmlGenerator --> Application: content
+Application -> WordPressClient: upload media
+WordPressClient --> Application: media ids
+Application -> WordPressClient: create post
+WordPressClient --> Application: post id / url
+Application -> HistoryManager: save history
+
+@enduml

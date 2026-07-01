@@ -1,0 +1,6 @@
+
+imapclient
+requests
+PyYAML
+python-dateutil
+Pillow

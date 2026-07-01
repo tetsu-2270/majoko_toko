@@ -1,0 +1,18 @@
+@startuml
+title Post State
+
+[*] --> Received
+Received --> ImagesDownloaded
+ImagesDownloaded --> ImagesSorted
+ImagesSorted --> MediaUploaded
+MediaUploaded --> DraftCreated
+DraftCreated --> HistorySaved
+HistorySaved --> Processed
+
+Received --> Skipped : no images
+MediaUploaded --> Failed : upload error
+DraftCreated --> Failed : post error
+Failed --> [*]
+Processed --> [*]
+
+@enduml

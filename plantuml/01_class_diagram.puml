@@ -1,0 +1,23 @@
+@startuml
+title Class Diagram
+
+class Application
+class ConfigManager
+class GmailClient
+class AttachmentManager
+class ImageSorter
+class HtmlGenerator
+class WordPressClient
+class HistoryManager
+class LogManager
+
+Application --> ConfigManager
+Application --> GmailClient
+Application --> AttachmentManager
+Application --> ImageSorter
+Application --> HtmlGenerator
+Application --> WordPressClient
+Application --> HistoryManager
+Application --> LogManager
+
+@enduml

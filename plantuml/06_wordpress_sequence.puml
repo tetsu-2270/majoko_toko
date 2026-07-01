@@ -1,0 +1,17 @@
+@startuml
+title WordPress Sequence
+
+participant Application
+participant WordPressClient
+participant WordPress
+
+Application -> WordPressClient: upload_media(images)
+WordPressClient -> WordPress: POST /wp-json/wp/v2/media
+WordPress --> WordPressClient: media ids
+Application -> WordPressClient: get_or_create_category()
+WordPressClient -> WordPress: GET/POST categories
+Application -> WordPressClient: create_post()
+WordPressClient -> WordPress: POST /wp-json/wp/v2/posts
+WordPress --> WordPressClient: post id / url
+
+@enduml

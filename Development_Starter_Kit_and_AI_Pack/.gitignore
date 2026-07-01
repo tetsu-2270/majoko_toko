@@ -1,0 +1,12 @@
+
+.venv/
+__pycache__/
+*.pyc
+logs/
+temp/
+images/
+history/
+config/config.yaml
+.env
+.pytest_cache/
+.coverage

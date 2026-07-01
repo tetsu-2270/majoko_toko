@@ -1,0 +1,28 @@
+gmail:
+  host: imap.gmail.com
+  port: 993
+  username: test@example.com
+  app_password: dummy
+  processed_label: Processed
+
+wordpress:
+  url: https://example.com
+  username: wp_user
+  application_password: dummy
+  default_status: draft
+  default_category: Blog
+
+paths:
+  template: config/template.html
+  temp_dir: temp
+  image_dir: images
+  log_file: logs/application.log
+  history_file: history/post_history.json
+
+retry:
+  max_count: 3
+  initial_wait_seconds: 2
+  backoff: exponential
+
+logging:
+  level: INFO

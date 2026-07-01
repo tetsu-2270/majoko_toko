@@ -1,0 +1,9 @@
+[
+  {
+    "post_id": 1,
+    "title": "sample",
+    "category": "Blog",
+    "created_at": "2026-07-02T00:00:00+09:00",
+    "mail_message_id": "sample-message-id"
+  }
+]

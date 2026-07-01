@@ -1,0 +1,17 @@
+@startuml
+title Gmail Sequence
+
+participant Application
+participant GmailClient
+participant Gmail
+
+Application -> GmailClient: connect()
+GmailClient -> Gmail: IMAP SSL login
+Gmail --> GmailClient: success
+Application -> GmailClient: fetch_unread()
+GmailClient -> Gmail: search UNSEEN
+Gmail --> GmailClient: messages
+Application -> GmailClient: mark_processed()
+GmailClient -> Gmail: add label / mark seen
+
+@enduml

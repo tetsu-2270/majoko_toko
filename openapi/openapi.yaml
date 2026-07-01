@@ -1,0 +1,165 @@
+openapi: 3.0.3
+info:
+  title: Gmail WordPress Publisher Interface
+  version: 0.1.0
+  description: >
+    Internal interface definition for the Gmail to WordPress publishing workflow.
+    WordPress endpoints are represented as external dependencies.
+
+servers:
+  - url: https://example.com
+
+paths:
+  /wp-json/wp/v2/media:
+    post:
+      summary: Upload media to WordPress
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/png:
+            schema:
+              type: string
+              format: binary
+      responses:
+        "201":
+          description: Media created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Media"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /wp-json/wp/v2/posts:
+    post:
+      summary: Create WordPress post
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PostCreateRequest"
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Post"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/ServerError"
+
+  /wp-json/wp/v2/categories:
+    get:
+      summary: Search WordPress categories
+      security:
+        - basicAuth: []
+      parameters:
+        - name: search
+          in: query
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+    post:
+      summary: Create WordPress category
+      security:
+        - basicAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+      responses:
+        "201":
+          description: Category created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Category"
+
+components:
+  securitySchemes:
+    basicAuth:
+      type: http
+      scheme: basic
+
+  responses:
+    Unauthorized:
+      description: Authentication failed
+    ServerError:
+      description: Temporary or permanent server error
+
+  schemas:
+    Media:
+      type: object
+      properties:
+        id:
+          type: integer
+        source_url:
+          type: string
+          format: uri
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+
+    PostCreateRequest:
+      type: object
+      required:
+        - title
+        - content
+        - status
+      properties:
+        title:
+          type: string
+        content:
+          type: string
+        status:
+          type: string
+          enum: [draft, publish, future]
+        categories:
+          type: array
+          items:
+            type: integer
+        featured_media:
+          type: integer
+
+    Post:
+      type: object
+      properties:
+        id:
+          type: integer
+        link:
+          type: string
+          format: uri
+        status:
+          type: string
