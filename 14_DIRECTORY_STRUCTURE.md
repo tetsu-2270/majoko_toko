@@ -14,7 +14,9 @@
 project/
 ├── config/
 │   ├── config.yaml
-│   └── template.html
+│   ├── template.html
+│   ├── credentials.json
+│   └── token.json
 ├── history/
 │   └── post_history.json
 ├── images/
@@ -74,6 +76,8 @@ Gitで管理するもの
 Git管理対象外
 
 -   config.yaml
+-   credentials.json
+-   token.json
 -   application.log
 -   post_history.json
 -   temp/
@@ -91,6 +95,8 @@ temp/
 images/
 history/
 config/config.yaml
+config/credentials.json
+config/token.json
 ```
 
 ------------------------------------------------------------------------

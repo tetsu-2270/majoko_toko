@@ -13,8 +13,8 @@
   ID        分類             内容                   対応
   --------- ---------------- ---------------------- -----------------
   ERR-001   設定             config.yaml 読込失敗   起動中止
-  ERR-002   認証             Gmail認証失敗          終了・ERRORログ
-  ERR-003   通信             IMAP接続失敗           3回リトライ
+  ERR-002   認証             Gmail OAuth認証失敗（credentials.json不備・トークン無効）   終了・ERRORログ
+  ERR-003   通信             Gmail API通信失敗      3回リトライ
   ERR-004   入力             添付画像なし           スキップ
   ERR-005   画像             画像保存失敗           ERRORログ
   ERR-006   API              WordPress認証失敗      終了
@@ -58,8 +58,9 @@
 
 ### Gmailエラー
 
--   アプリケーションパスワード確認
--   IMAP有効化確認
+-   `config/credentials.json` の配置・内容確認
+-   `config/token.json` の有無・有効期限確認（無効な場合は削除して再認証）
+-   Google Cloud ConsoleでOAuthクライアントが有効か確認
 
 ### WordPressエラー
 

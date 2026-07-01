@@ -12,8 +12,8 @@
 
 -   Python 3.12 以上
 -   Git
--   Gmail アカウント（IMAP有効）
--   Gmail アプリケーションパスワード
+-   Gmail アカウント（対象: majokkotoko@gmail.com）
+-   Google Cloud ConsoleでOAuthクライアントを作成し取得した `credentials.json`
 -   WordPress 管理者権限
 -   WordPress Application Password
 
@@ -83,6 +83,11 @@ temp/
 
 -   投稿テンプレートを配置
 
+`config/credentials.json`
+
+-   Google Cloud ConsoleでダウンロードしたOAuthクライアント情報を配置
+-   Gitにコミットしない（.gitignore対象）
+
 ------------------------------------------------------------------------
 
 ## 13.8 動作確認
@@ -91,9 +96,12 @@ temp/
 python main.py
 ```
 
+初回実行時のみ、ブラウザが自動的に開きGoogleアカウントへのログインとスコープ（gmail.readonly）への同意が必要。
+同意完了後 `config/token.json` が自動生成され、以降はブラウザ操作なしで実行できる。
+
 確認項目
 
--   Gmail接続成功
+-   Gmail接続成功（初回はOAuth同意画面が表示される）
 -   添付画像取得
 -   WordPress接続成功
 -   下書き記事作成
@@ -127,8 +135,8 @@ python main.py
 ## 13.11 トラブルシューティング
 
   症状                   確認項目
-  ---------------------- ----------------------
-  Gmail接続不可          IMAP・認証
+  ---------------------- ------------------------------------
+  Gmail接続不可          credentials.json・token.json・スコープ
   WordPress接続不可      Application Password
   画像投稿失敗           REST API
   テンプレート読込失敗   配置場所

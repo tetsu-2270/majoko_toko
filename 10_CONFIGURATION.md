@@ -13,11 +13,11 @@
 
 ``` yaml
 gmail:
-  host: imap.gmail.com
-  port: 993
-  username: your@gmail.com
-  app_password: xxxxxxxxxxxxxxxx
-  processed_label: Processed
+  target_address: majokkotoko@gmail.com
+  credentials_path: config/credentials.json
+  token_path: config/token.json
+  scopes:
+    - https://www.googleapis.com/auth/gmail.readonly
 
 wordpress:
   url: https://example.com
@@ -46,13 +46,12 @@ logging:
 
 ## 10.3 Gmail設定
 
-  項目              説明
-  ----------------- ----------------------------
-  host              IMAPサーバー
-  port              接続ポート
-  username          Gmailアドレス
-  app_password      アプリケーションパスワード
-  processed_label   処理済みラベル
+  項目               説明
+  ------------------ ----------------------------------------------
+  target_address     対象Gmailアドレス
+  credentials_path   OAuthクライアント情報ファイル（Gitにコミットしない）
+  token_path         認証済みトークン保存先（Gitにコミットしない。初回実行時に自動生成）
+  scopes             Gmail APIスコープ（まずは gmail.readonly のみ）
 
 ------------------------------------------------------------------------
 
@@ -99,6 +98,7 @@ logging:
 ## 10.8 セキュリティ
 
 -   config.yaml はGit管理対象外
+-   config/credentials.json、config/token.json はGit管理対象外
 -   認証情報は平文公開しない
 -   必要に応じて環境変数へ移行可能
 

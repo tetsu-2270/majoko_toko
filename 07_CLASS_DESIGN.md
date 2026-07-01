@@ -49,11 +49,12 @@ Application
 
 ### GmailClient
 
--   IMAP接続
--   未読メール取得
+-   Gmail API接続（OAuth 2.0、初回ブラウザ同意・以降トークン自動更新）
+-   未読メール取得（gmail.readonlyスコープ）
 -   添付取得
--   ラベル付与
--   既読化
+
+注記: gmail.readonlyスコープでは既読化・ラベル付与はできないため、これらはGmailClientの責務から除外する。
+重複処理防止は HistoryManager（投稿履歴のmail_message_id照合）が担う。
 
 ### AttachmentManager
 
@@ -118,7 +119,7 @@ HistoryManager
 -   1クラス1責務
 -   APIアクセスを集約
 -   テスト容易性を重視
--   将来的なGmail API対応を考慮
+-   将来的なgmail.modifyスコープ対応（既読化・ラベル付与）を考慮
 -   WordPress以外への拡張を容易にする
 
 ------------------------------------------------------------------------

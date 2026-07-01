@@ -13,7 +13,9 @@
 project/
 ├── config/
 │   ├── config.yaml
-│   └── template.html
+│   ├── template.html
+│   ├── credentials.json
+│   └── token.json
 ├── logs/
 │   └── application.log
 ├── history/
@@ -28,14 +30,18 @@ config.yaml 例
 
 ``` yaml
 gmail:
-  host: imap.gmail.com
+  target_address: majokkotoko@gmail.com
+  credentials_path: config/credentials.json
+  token_path: config/token.json
 
 wordpress:
   url: https://example.com
 ```
 
-保持項目 - Gmail接続情報 - WordPress接続情報 - 投稿先カテゴリ -
+保持項目 - Gmail接続情報（OAuth 2.0） - WordPress接続情報 - 投稿先カテゴリ -
 ログレベル - 一時フォルダ
+
+投稿処理済みメールの重複判定は投稿履歴（5.4）の mail_message_id で行う（Gmail側のラベルには依存しない）。
 
 ## 5.4 投稿履歴
 

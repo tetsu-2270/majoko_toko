@@ -6,7 +6,7 @@
 
 本システムは以下の外部APIを利用する。
 
--   Gmail(IMAP)
+-   Gmail API
 -   WordPress REST API
 
 ------------------------------------------------------------------------
@@ -15,24 +15,37 @@
 
 ### 認証方式
 
--   Gmail アプリケーションパスワード
--   IMAP over SSL
+-   OAuth 2.0（Googleが提供する `google-auth-oauthlib` を利用）
+-   `credentials.json`（Google Cloud ConsoleのOAuthクライアント情報）を用いて初回認証
+-   初回はローカルブラウザでGoogleログイン・スコープ同意を実施
+-   認証後は `token.json` に認証情報（リフレッシュトークン含む）を保存し、次回以降はブラウザ操作なしで自動更新
 
-### 接続先
+### 対象アカウント
 
-  項目   値
-  ------ ----------------
-  Host   imap.gmail.com
-  Port   993
-  SSL    有効
+  項目             値
+  ---------------- --------------------------
+  対象Gmailアドレス   majokkotoko@gmail.com
+  スコープ           https://www.googleapis.com/auth/gmail.readonly
+
+### 利用エンドポイント（google-api-python-client 経由）
+
+  操作                     API
+  ------------------------ ----------------------------------------
+  未読メール一覧取得       `users.messages.list` (q="is:unread")
+  メール本文・添付取得     `users.messages.get` (format="raw")
 
 ### 処理内容
 
--   未読メール取得
+-   未読メール取得（`is:unread` クエリ）
+-   取得した生メール（RFC822, base64url）をデコードし、既存の `email.message` パース処理へ接続
 -   添付画像取得
 -   Message-ID取得
--   処理後に既読化
--   任意ラベル付与
+
+### スコープ上の制約
+
+-   `gmail.readonly` は読み取り専用のため、既読化・ラベル付与はできない
+-   重複処理防止は Gmail 側のラベルではなく、`HistoryManager` が保持する投稿履歴（`mail_message_id`）で判定する
+-   将来 `gmail.modify` へスコープを拡張した場合、既読化・ラベル付与機能を追加可能な構造とする（06.10参照）
 
 ------------------------------------------------------------------------
 
@@ -130,8 +143,7 @@ featured_mediaへMedia IDを設定
 
 ## 6.10 将来拡張
 
--   OAuth認証対応
--   Gmail API対応
+-   `gmail.modify` スコープ対応（既読化・ラベル付与の復活）
 -   WordPressカスタム投稿対応
 -   タグ自動生成
 -   AIによるタイトル生成

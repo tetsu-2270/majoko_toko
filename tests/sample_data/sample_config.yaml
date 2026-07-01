@@ -1,9 +1,9 @@
 gmail:
-  host: imap.gmail.com
-  port: 993
-  username: test@example.com
-  app_password: dummy
-  processed_label: Processed
+  target_address: test@example.com
+  credentials_path: config/credentials.json
+  token_path: config/token.json
+  scopes:
+    - https://www.googleapis.com/auth/gmail.readonly
 
 wordpress:
   url: https://example.com

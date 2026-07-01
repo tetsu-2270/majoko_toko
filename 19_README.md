@@ -5,7 +5,7 @@
 Gmailで受信した画像付きメールを解析し、画像を番号順に並べ替えてWordPressへ下書き投稿するアプリです。
 
 ## 主な機能
-- Gmail(IMAP)受信
+- Gmail API（OAuth 2.0）受信
 - 添付画像取得
 - IMG9999→IMG0001対応ソート
 - WordPress REST API投稿

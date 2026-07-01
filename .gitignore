@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+logs/
+temp/
+images/
+history/
+config/config.yaml
+config/credentials.json
+config/token.json
+.pytest_cache/
+.DS_Store

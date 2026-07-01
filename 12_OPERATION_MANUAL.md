@@ -12,8 +12,8 @@
 
 -   config.yaml が配置されている
 -   template.html が存在する
--   Gmail IMAP が有効
--   Gmail アプリケーションパスワード設定済み
+-   config/credentials.json が配置されている
+-   初回のGoogleログイン・スコープ同意が完了し config/token.json が生成されている
 -   WordPress Application Password 設定済み
 -   ネットワーク疎通確認
 
@@ -47,12 +47,12 @@ python main.py
 
 ## 12.5 障害対応
 
-  障害                   確認事項               対応
-  ---------------------- ---------------------- ----------
-  Gmail接続不可          認証情報・IMAP         設定修正
-  WordPress認証失敗      Application Password   再発行
-  画像アップロード失敗   API応答                再実行
-  テンプレートなし       ファイル有無           配置
+  障害                   確認事項                        対応
+  ---------------------- ------------------------------- ----------
+  Gmail接続不可          credentials.json・token.json    設定修正・再認証
+  WordPress認証失敗      Application Password            再発行
+  画像アップロード失敗   API応答                         再実行
+  テンプレートなし       ファイル有無                     配置
 
 ------------------------------------------------------------------------
 
@@ -87,8 +87,13 @@ python main.py
 
 -   config.yaml
 -   template.html
+-   token.json（再認証の手間を省くため。ただし取り扱いは機密情報に準じる）
 -   post_history.json
 -   logs
+
+対象外（バックアップ・共有ともに不可、漏洩時は再発行）
+
+-   credentials.json
 
 推奨頻度
 
