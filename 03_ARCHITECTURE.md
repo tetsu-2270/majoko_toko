@@ -97,11 +97,56 @@ flowchart TD
 # 7. DataModel
 
 -   MailData
+-   AttachmentData
 -   PostData
 -   ImageData
 -   ConfigData
 
 詳細は04_DATA_MODEL.mdで定義する。
+
+## 7.1 添付データの受け渡し
+
+GmailClientはMIMEメールを解析し、ファイル名を持つ各パートを`AttachmentData`
+（filename / content / content_type）へ変換して`MailData.attachments`へ設定する。
+GmailClientはファイル保存や画像形式判定を行わない。
+
+```text
+GmailClient
+  └─ MailData.attachments: list[AttachmentData]
+       └─ AttachmentManager.save() : JPG/JPEG/PNGのみをローカル保存し list[Path] を返す
+            └─ ImageSorter.sort() : IMG9999→IMG0001のロールオーバーを考慮して並び替え
+                 └─ WordPressClient.upload_media() : 並び替え順のままアップロード
+```
+
+添付なし・非対応形式のみの場合、`AttachmentManager.save()`後の画像が0枚となり、
+Applicationはそのメールを失敗扱いとしてスキップする（投稿・履歴保存を行わない）。
+
+## 7.2 複数メール処理の順序と実行中キャッシュ
+
+`MailData.received_at_ms`（Gmail `internalDate`由来のepochミリ秒）を受信時刻の正本とする。
+`Application.run()`は、Gmail取得直後に全メールをこの受信時刻の古い順へ安定ソートしてから
+1件ずつ直列処理する（Gmail一覧の返却順は信頼しない。並列投稿は行わない）。
+
+```text
+GmailClient.fetch_unread() → list[MailData]（順不同）
+  → Application._order_by_received_at() : received_at_ms昇順の安定ソート（None=不明は末尾）
+    → 1件ずつ直列処理
+```
+
+1回の`Application.run()`実行中だけ、投稿成功記事を`(作品名, 話数) → (投稿タイトル, URL)`の
+キャッシュ（`posted_articles`）へ保持する。話数の自動採番・前回記事解決は、WordPress検索と
+このキャッシュの両方を参照する（WordPressの検索結果が直後の投稿をまだ反映しない場合が
+あるため）。投稿失敗・重複履歴でスキップした記事はキャッシュへ登録しない。キャッシュは
+次回起動へ永続化しない。
+
+前回記事解決は、同一作品名の直前話（現在話数-1）のみを対象とし、次の優先順で行う。
+
+```text
+(1) 実行中キャッシュ（同一作品・直前話） → (2) WordPress標準形式 → (3) WordPress旧No形式
+```
+
+直前話が存在しない場合（第1話・欠番）は前回セクションを生成せず、それより前の話数へは
+遡らない。
 
 ------------------------------------------------------------------------
 
