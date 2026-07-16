@@ -6,8 +6,10 @@ import base64
 import email
 import logging
 import re
+from datetime import timezone
 from email.header import decode_header as _decode_header
 from email.message import Message
+from email.utils import parsedate_to_datetime
 from pathlib import Path
 
 from google.auth.transport.requests import Request
@@ -16,11 +18,25 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 
 from src.config_manager import GmailConfig
-from src.models import MailData
+from src.models import AttachmentData, MailData
 
 logger = logging.getLogger(__name__)
 
-_SUBJECT_RE = re.compile(r"^(.+?)\s+No(\d+)\s*$", re.IGNORECASE)
+_SPACE = r"[ 　]"
+_TILDE = r"[~～〜]"
+_DIGIT = r"[0-9０-９]"
+_N = r"[NnＮｎ]"
+_O = r"[OoＯｏ]"
+
+# 解析順序: (1)~・〜・～区切り → (2)半角/全角No形式 → (3)区切りなしの裸の数字。
+# "AAAA No 42"のような文字列は、(3)を先に試すと"No"まで作品名に取り込まれてしまうため、
+# 必ず(2)を(3)より先に判定する。
+_TILDE_NUMBER_RE = re.compile(rf"^(.+?){_SPACE}+{_TILDE}{_SPACE}*({_DIGIT}+){_SPACE}*$")
+_NO_NUMBER_RE = re.compile(rf"^(.+?){_SPACE}+{_N}{_O}{_SPACE}*({_DIGIT}+){_SPACE}*$")
+_BARE_NUMBER_RE = re.compile(rf"^(.+?){_SPACE}+({_DIGIT}+){_SPACE}*$")
+_NUMBER_PATTERNS = (_TILDE_NUMBER_RE, _NO_NUMBER_RE, _BARE_NUMBER_RE)
+_TRAILING_SEPARATOR_ONLY_RE = re.compile(rf"(?:{_TILDE}|{_N}{_O}){_SPACE}*$")
+_FULLWIDTH_DIGIT_TRANS = str.maketrans("０１２３４５６７８９", "0123456789")
 _CATEGORY_RE = re.compile(r"^カテゴリ[ーー]?[：:]\s*(.+)", re.MULTILINE)
 _SCHEDULED_RE = re.compile(r"^投稿日[：:]\s*(.+)", re.MULTILINE)
 
@@ -38,16 +54,47 @@ def _decode_str(value: str) -> str:
 
 
 def parse_subject(subject: str) -> tuple[str, int | None]:
-    """件名を解析してタイトルと連番を返す。
+    """件名を解析して作品名と話数を返す。
+
+    話数の表記揺れ（半角/全角スペース、半角チルダ"~"/全角チルダ"～"/波ダッシュ"〜"、
+    半角/全角"No"表記、半角/全角数字の組み合わせ）を吸収し、話数を数値として取り出す。
+    判定は次の優先順で行う（"AAAA No 42"のような"No"区切りが、区切りなしの裸の数字
+    パターンに"No"ごと作品名として取り込まれるのを防ぐため）。
+
+        1. "~"・"〜"・"～"区切りの明示話数
+        2. 半角/全角"No"形式の明示話数
+        3. 区切りなし（空白のみ）の裸の数字
+
+    話数を認識できない件名は、件名全体を作品名として扱い話数`None`を返す（呼び出し側で
+    WordPress上の同一作品名の最新話数+1を自動採番する）。
 
     例:
-        "魔女っこ日記 No5" → ("魔女っこ日記", 5)
-        "新しい話"         → ("新しい話", None)
+        "AAAA 42"        → ("AAAA", 42)
+        "AAAA　４２"      → ("AAAA", 42)
+        "AAAA ~ 42"      → ("AAAA", 42)
+        "AAAA　〜　４２"  → ("AAAA", 42)
+        "AAAA No42"      → ("AAAA", 42)
+        "AAAA No 42"     → ("AAAA", 42)
+        "AAAA Ｎｏ４２"   → ("AAAA", 42)
+        "AAAA"           → ("AAAA", None)
+
+    Raises:
+        ValueError: 件名が空の場合、または"AAAA ~"・"AAAA No"のように区切り文字（表記）
+            だけが末尾に残り話数が存在しない場合。
     """
-    m = _SUBJECT_RE.match(subject.strip())
-    if m:
-        return m.group(1).strip(), int(m.group(2))
-    return subject.strip(), None
+    if not subject:
+        raise ValueError("件名が空です")
+
+    for pattern in _NUMBER_PATTERNS:
+        m = pattern.match(subject)
+        if m:
+            title, digits = m.group(1), m.group(2)
+            return title, int(digits.translate(_FULLWIDTH_DIGIT_TRANS))
+
+    if _TRAILING_SEPARATOR_ONLY_RE.search(subject):
+        raise ValueError(f"件名の話数が区切り文字のみで空です: {subject!r}")
+
+    return subject, None
 
 
 def parse_body(body: str) -> tuple[str, str | None]:
@@ -118,7 +165,7 @@ class GmailClient:
             msg = self._decode_raw_message(raw_msg["raw"])
 
             try:
-                mail_data = self._parse_message(msg)
+                mail_data = self._parse_message(msg, raw_msg)
                 mail_list.append(mail_data)
                 logger.info("メール取得: %s", mail_data.subject)
             except (ValueError, KeyError) as exc:
@@ -162,15 +209,29 @@ class GmailClient:
         if self._service is None:
             raise RuntimeError("connect() を先に呼び出してください。")
 
-    def _parse_message(self, msg: Message) -> MailData:
-        """email.Message を MailData に変換する。"""
+    def _parse_message(self, msg: Message, raw_msg: dict) -> MailData:
+        """email.Message を MailData に変換する。
+
+        件名はMIMEデコード後、前後の空白のみを除去した文字列を`MailData.subject`として保持する。
+        `parse_subject()`が作品名・話数（表記揺れ吸収済み）を解析し、話数が無ければ
+        `MailData.number`は`None`となる（Application側でWordPress検索により自動採番する）。
+        件名が空、または区切り文字のみで話数が存在しない場合は`parse_subject()`が
+        `ValueError`を送出し、呼び出し元（`fetch_unread`）がこのメールをスキップして
+        WARNログへ記録する。
+
+        `raw_msg["internalDate"]`（Gmail APIが返すepochミリ秒文字列）をGmail受信時刻の
+        正本として`MailData.received_at_ms`へ設定する。複数メール処理時の投稿順の
+        判定に使用する（順序解決はApplication側の責務）。
+        """
         raw_subject = msg.get("Subject", "")
-        subject = _decode_str(raw_subject)
-        message_id = msg.get("Message-ID", "")
+        subject = _decode_str(raw_subject).strip()
+        message_id = msg.get("Message-ID", "") or raw_msg.get("id", "")
 
         body = self._extract_body(msg)
         title, number = parse_subject(subject)
         category, scheduled_at = parse_body(body)
+        attachments = self._extract_attachments(msg)
+        received_at_ms = self._resolve_received_at_ms(raw_msg, msg, subject)
 
         return MailData(
             message_id=message_id,
@@ -180,7 +241,65 @@ class GmailClient:
             category=category,
             scheduled_at=scheduled_at,
             body=body,
+            attachments=attachments,
+            received_at_ms=received_at_ms,
         )
+
+    @staticmethod
+    def _resolve_received_at_ms(raw_msg: dict, msg: Message, subject: str) -> int | None:
+        """Gmail受信時刻をepochミリ秒で解決する。
+
+        `raw_msg["internalDate"]`を優先し、欠落・不正な場合のみメールの`Date`ヘッダーへ
+        フォールバックする。どちらも得られない場合は`None`を返しWARNログを記録する
+        （アプリ全体は停止しない。並び替え時は時刻不明メールとして扱われる）。
+        """
+        internal_date = raw_msg.get("internalDate")
+        if internal_date:
+            try:
+                return int(internal_date)
+            except (TypeError, ValueError):
+                logger.warning("internalDateの解析に失敗しました (件名: %s): %r", subject, internal_date)
+
+        date_header = msg.get("Date")
+        if date_header:
+            try:
+                dt = parsedate_to_datetime(date_header)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return int(dt.timestamp() * 1000)
+            except (TypeError, ValueError, OverflowError):
+                logger.warning("Dateヘッダーの解析に失敗しました (件名: %s): %r", subject, date_header)
+
+        logger.warning("受信時刻を解決できませんでした (件名: %s)", subject)
+        return None
+
+    @staticmethod
+    def _extract_attachments(msg: Message) -> list[AttachmentData]:
+        """MIMEパートを再帰的に走査し、ファイル名を持つ添付を抽出する。"""
+        attachments: list[AttachmentData] = []
+
+        for part in msg.walk():
+            if part.get_content_maintype() == "multipart":
+                continue
+
+            raw_filename = part.get_filename()
+            if not raw_filename:
+                continue
+
+            filename = _decode_str(raw_filename)
+            data = part.get_payload(decode=True)
+            if not data:
+                continue
+
+            attachments.append(
+                AttachmentData(
+                    filename=filename,
+                    content=data,
+                    content_type=part.get_content_type(),
+                )
+            )
+
+        return attachments
 
     @staticmethod
     def _extract_body(msg: Message) -> str:

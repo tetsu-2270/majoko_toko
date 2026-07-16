@@ -120,6 +120,127 @@ class TestCreatePost:
         assert body.get("date") == "2026-07-10T20:00:00"
 
 
+class TestFindPostByTitle:
+    def test_returns_exact_match(self, client: WordPressClient) -> None:
+        posts = [{"title": {"rendered": "AAAA ~ 41"}, "link": "https://example.com/?p=41"}]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            url, title = client.find_post_by_title("AAAA ~ 41")
+
+        assert url == "https://example.com/?p=41"
+        assert title == "AAAA ~ 41"
+
+    def test_ignores_partial_matches(self, client: WordPressClient) -> None:
+        """部分一致・接頭辞違いのタイトルを採用せず、完全一致のみを採用する。"""
+        posts = [
+            {"title": {"rendered": "AAAA番外編 ~ 41"}, "link": "https://example.com/?p=1"},
+            {"title": {"rendered": "AAAA ~ 410"}, "link": "https://example.com/?p=2"},
+            {"title": {"rendered": "AAAA ~ 41"}, "link": "https://example.com/?p=3"},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            url, title = client.find_post_by_title("AAAA ~ 41")
+
+        assert url == "https://example.com/?p=3"
+        assert title == "AAAA ~ 41"
+
+    def test_matches_after_html_entity_unescape(self, client: WordPressClient) -> None:
+        """WordPressがHTMLエンティティ化して返したタイトルも、アンエスケープ後に一致すれば採用する。"""
+        posts = [{"title": {"rendered": "AAAA &#8211; 41"}, "link": "https://example.com/?p=1"}]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            url, title = client.find_post_by_title("AAAA – 41")
+
+        assert url == "https://example.com/?p=1"
+        assert title == "AAAA &#8211; 41"
+
+    def test_returns_none_when_not_found(self, client: WordPressClient) -> None:
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response([])
+            url, title = client.find_post_by_title("AAAA ~ 41")
+
+        assert (url, title) == (None, None)
+
+
+class TestFindLatestPostNumber:
+    def test_recognizes_new_tilde_format(self, client: WordPressClient) -> None:
+        posts = [
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 ~ 39"}},
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 ~ 40"}},
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 ~ 41"}},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            result = client.find_latest_post_number("お菓子外しさんとカタカナ男")
+
+        assert result == 41
+
+    def test_recognizes_legacy_no_format(self, client: WordPressClient) -> None:
+        posts = [
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 No39"}},
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 No 40"}},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            result = client.find_latest_post_number("お菓子外しさんとカタカナ男")
+
+        assert result == 40
+
+    def test_mixed_new_and_legacy_formats_returns_max(self, client: WordPressClient) -> None:
+        posts = [
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 No39"}},
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 ~ 40"}},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            result = client.find_latest_post_number("お菓子外しさんとカタカナ男")
+
+        assert result == 40
+
+    def test_ignores_malformed_title(self, client: WordPressClient) -> None:
+        """誤って作成された「作品名 41 No1」形式は採番対象としない。"""
+        posts = [
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 41 No1"}},
+            {"title": {"rendered": "お菓子外しさんとカタカナ男 ~ 5"}},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            result = client.find_latest_post_number("お菓子外しさんとカタカナ男")
+
+        assert result == 5
+
+    def test_excludes_different_title_with_longer_prefix(self, client: WordPressClient) -> None:
+        """検索対象より長い別作品名（例: "AAAAA"）は"AAAA"の採番対象に含めない。"""
+        posts = [
+            {"title": {"rendered": "AAAAA ~ 100"}},
+            {"title": {"rendered": "AAAA ~ 5"}},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            result = client.find_latest_post_number("AAAA")
+
+        assert result == 5
+
+    def test_excludes_title_with_extra_word_after_prefix(self, client: WordPressClient) -> None:
+        """作品名の直後に区切り以外の文字列が続くタイトル（例: "AAAA テスト ~ 50"）は対象外とする。"""
+        posts = [
+            {"title": {"rendered": "AAAA テスト ~ 50"}},
+            {"title": {"rendered": "AAAA ~ 5"}},
+        ]
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response(posts)
+            result = client.find_latest_post_number("AAAA")
+
+        assert result == 5
+
+    def test_returns_none_when_no_matching_posts(self, client: WordPressClient) -> None:
+        with patch("src.wordpress_client.requests.get") as mock_get:
+            mock_get.return_value = _mock_response([])
+            result = client.find_latest_post_number("お菓子外しさんとカタカナ男")
+
+        assert result is None
+
+
 class TestNormalizeDatetime:
     def test_slash_format(self) -> None:
         result = WordPressClient._normalize_datetime("2026/07/10 20:00")

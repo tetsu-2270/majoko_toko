@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import html
 import logging
+import re
 import time
 from pathlib import Path
 
@@ -86,32 +88,44 @@ class WordPressClient:
         return category_id
 
     def find_post_by_title(self, title: str) -> tuple[str | None, str | None]:
-        """完全一致タイトルで記事を検索し (url, title) を返す。見つからなければ (None, None)。"""
+        """完全一致タイトルで記事を検索し (url, title) を返す。見つからなければ (None, None)。
+
+        WordPressはタイトルをHTMLエンティティ化して返す場合がある（例: `&`→`&amp;`）ため、
+        比較時のみ`html.unescape()`で戻して完全一致判定する。戻り値の`title`はHTML埋め込み
+        で安全なようエンティティ化されたままの`rendered`を返す。
+        """
         url = self._base_url + _POSTS_ENDPOINT
         params = {"search": title, "per_page": 10, "status": "any"}
         resp = self._session_get(url, params=params)
         for post in resp.json():
             rendered = post.get("title", {}).get("rendered", "")
-            if rendered == title:
+            if html.unescape(rendered) == title:
                 return post["link"], rendered
         return None, None
 
     def find_latest_post_number(self, title_prefix: str) -> int | None:
-        """タイトルプレフィックスで記事を検索し、最大の連番を返す。
+        """タイトルプレフィックスで記事を検索し、最大の話数を返す。
+
+        標準形式「{title_prefix} ~ {話数}」に加え、移行期間の互換性のため
+        旧形式「{title_prefix} No{話数}」「{title_prefix} No {話数}」も認識する。
+        いずれの形式にも一致しないタイトル（誤って作成された過去記事等）は対象外とする。
 
         Returns:
-            最大連番。記事が存在しない場合は None。
+            最大話数。記事が存在しない場合は None。
         """
-        import re
         url = self._base_url + _POSTS_ENDPOINT
         params = {"search": title_prefix, "per_page": 100, "status": "any"}
         resp = self._session_get(url, params=params)
         posts: list[dict] = resp.json()
 
-        pattern = re.compile(rf"^{re.escape(title_prefix)}\s+No(\d+)", re.IGNORECASE)
+        escaped_prefix = re.escape(title_prefix)
+        new_pattern = re.compile(rf"^{escaped_prefix}\s*~\s*(\d+)\s*$")
+        legacy_pattern = re.compile(rf"^{escaped_prefix}\s+No\s*(\d+)\s*$", re.IGNORECASE)
+
         numbers: list[int] = []
         for post in posts:
-            m = pattern.match(post.get("title", {}).get("rendered", ""))
+            rendered = post.get("title", {}).get("rendered", "")
+            m = new_pattern.match(rendered) or legacy_pattern.match(rendered)
             if m:
                 numbers.append(int(m.group(1)))
 
@@ -226,7 +240,6 @@ class WordPressClient:
             2026/07/10 20:00  →  2026-07-10T20:00:00
             2026-07-10T20:00:00  →  そのまま
         """
-        import re
         m = re.match(r"(\d{4})[/-](\d{2})[/-](\d{2})\s+(\d{2}):(\d{2})", value)
         if m:
             return f"{m.group(1)}-{m.group(2)}-{m.group(3)}T{m.group(4)}:{m.group(5)}:00"
